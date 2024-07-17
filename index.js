@@ -31,19 +31,14 @@ async function run() {
     try {
         const userCollection = client.db('zcash').collection('users')
 
-
-
         app.post('/users', async (req, res) => {
             const { name, email, password, checkRole } = req.body;
             // existing user
-
             const existingUser = await userCollection.findOne({ email: email });
             if (existingUser) {
                 return res.send({ message: 'User already exists',insertedId: null });
             }
-            // পাসওয়ার্ড এনক্রিপ্ট কর 
             const hash = bcrypt.hashSync(password, salt);
-            // নতুন ব্যবহারকারীর ডেটা তৈরি করা
             const data = {
                 name: name,
                 email: email,
@@ -51,12 +46,10 @@ async function run() {
                 checkRole: checkRole
             };
             console.log(data);
-            // ডাটাবেজে ব্যবহারকারী যুক্ত করা
+
             const result = await userCollection.insertOne(data);
             res.send(result)
         })
-
-
 
         app.get('/user', async (req, res) => {
             const { email, password } = req.query;
@@ -82,75 +75,6 @@ async function run() {
               res.status(500).send({ message: 'Internal Server Error' });
             }
           });
-
-
-
-
-        // other code this 
-        // jwt token api making related
-        app.post('/jwt', async (req, res) => {
-            const user = req.body;
-            const token = jwt.sign(user, process.env.ACCESS_TOKEN, { expiresIn: '1h' })
-            // console.log("the token is ",token);
-            res.send({ token })
-        })
-        // middleware
-        const verifyToken = (req, res, next) => {
-            console.log("inserted token", req.headers.authorization);
-            if (!req.headers.authorization) {
-                return res.status(401).send({ message: 'Unauthorized access' })
-            }
-            const token = req.headers.authorization.split(' ')[1]
-            jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
-                if (err) {
-                    return res.status(401).send({ message: 'Unauthorized access' })
-                }
-                req.decoded = decoded;
-                next()
-            })
-        }
-        // admin verify
-        const adminVerify = async (req, res, next) => {
-            const email = req.decoded.email;
-            const query = { email: email }
-            const user = await userCollection.findOne(query)
-            const isAdmin = user?.role === 'admin'
-            if (!isAdmin) {
-                return res.status(403).send({ message: 'Forbidden Access' })
-            }
-            next()
-        }
-
-        // the last two api is not project related , only for knowing , TODO:use verifyToken
-        app.get('/users/admin/:email', async (req, res) => {
-            const email = req.params.email;
-            if (email !== req.decoded.email) {
-                return res.status(403).send({ message: "forbidden access" })
-            }
-            const query = { email: email }
-            const user = await userCollection.findOne(query)
-            let admin = false
-            if (user) {
-                admin = user.role === 'admin'
-            }
-            res.send({ admin })
-        })
-
-        // TODO: must use verifyToken, adminVerify
-        app.patch('/users/admin/:id', async (req, res) => {
-            const id = req.params.id;
-            const filter = { _id: new ObjectId(id) }
-            const updateDoc = {
-                $set: {
-                    role: 'admin'
-                }
-            }
-            const result = await userCollection.updateOne(filter, updateDoc)
-            res.send(result)
-        })
-
-        // Send a ping to confirm a successful connection
-        // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
 
