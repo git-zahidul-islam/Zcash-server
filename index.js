@@ -8,10 +8,12 @@ const bcrypt = require('bcrypt');
 const salt = 10;
 // const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const port = process.env.PORT || 5000
+const bodyParser = require('body-parser');
 
 // middleware
 app.use(express.json())
 app.use(cors())
+app.use(bodyParser.json())
 // app.use(express.static("public"));
 
 // mongodb data  [change this data]
@@ -46,12 +48,11 @@ async function run() {
                 checkRole: checkRole
             };
             console.log(data);
-
             const result = await userCollection.insertOne(data);
             res.send(result)
         })
 
-        app.get('/user', async (req, res) => {
+        app.post('/user', async (req, res) => {
             const { email, password } = req.query;
             // email and pass check 
             if (!email || !password) {
@@ -68,13 +69,21 @@ async function run() {
               if (!isMatch) {
                 return res.send({ message: 'Password is incorrect', status: 400 });
               }
+              // test and change this cecret key
+              const token = jwt.sign({ user }, 'your-secret-key-90899', {
+                expiresIn: 86400 // 24 hours
+              });
+              // টোকেন সহ রেসপন্স করা
+              res.status(200).send({ token: token });
               // Successfully authenticated
-              res.send(user);
+              // res.send(user);
             } catch (error) {
               console.error('Error occurred:', error);
               res.status(500).send({ message: 'Internal Server Error' });
             }
           });
+
+
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
 
