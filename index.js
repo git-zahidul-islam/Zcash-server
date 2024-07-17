@@ -3,6 +3,9 @@ const app = express()
 const cors = require('cors')
 const jwt = require('jsonwebtoken')
 require('dotenv').config()
+// bycript
+const bcrypt = require('bcrypt');
+const salt = 10;
 // const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const port = process.env.PORT || 5000
 
@@ -13,7 +16,7 @@ app.use(cors())
 
 // mongodb data  [change this data]
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const uri = `mongodb+srv://bossUser:NMFCCAKtFF8LsSGY@cluster0.oy4gwmh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.oy4gwmh.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -26,11 +29,64 @@ const client = new MongoClient(uri, {
 
 async function run() {
     try {
-        // Connect the client to the server	(optional starting in v4.7)
-        // await client.connect();
-        const userCollection = client.db('bistroDB').collection('users')
-        
+        const userCollection = client.db('zcash').collection('users')
 
+
+
+        app.post('/users', async (req, res) => {
+            const { name, email, password, checkRole } = req.body;
+            // existing user
+
+            const existingUser = await userCollection.findOne({ email: email });
+            if (existingUser) {
+                return res.send({ message: 'User already exists',insertedId: null });
+            }
+            // পাসওয়ার্ড এনক্রিপ্ট কর 
+            const hash = bcrypt.hashSync(password, salt);
+            // নতুন ব্যবহারকারীর ডেটা তৈরি করা
+            const data = {
+                name: name,
+                email: email,
+                password: hash,
+                checkRole: checkRole
+            };
+            console.log(data);
+            // ডাটাবেজে ব্যবহারকারী যুক্ত করা
+            const result = await userCollection.insertOne(data);
+            res.send(result)
+        })
+
+
+
+        app.get('/user', async (req, res) => {
+            const { email, password } = req.query;
+            // email and pass check 
+            if (!email || !password) {
+              return res.status(400).send({ message: 'Email and password are required' });
+            }
+            try {
+              // Find user by email
+              const user = await userCollection.findOne({ email: email });
+              if (!user) {
+                return res.status(404).send({ message: 'User not found' });
+              }
+              // Check password
+              const isMatch = bcrypt.compareSync(password,user.password);
+              if (!isMatch) {
+                return res.send({ message: 'Password is incorrect', status: 400 });
+              }
+              // Successfully authenticated
+              res.send(user);
+            } catch (error) {
+              console.error('Error occurred:', error);
+              res.status(500).send({ message: 'Internal Server Error' });
+            }
+          });
+
+
+
+
+        // other code this 
         // jwt token api making related
         app.post('/jwt', async (req, res) => {
             const user = req.body;
@@ -65,15 +121,6 @@ async function run() {
             next()
         }
 
-
-
-
-
-
-
-
-
-        
         // the last two api is not project related , only for knowing , TODO:use verifyToken
         app.get('/users/admin/:email', async (req, res) => {
             const email = req.params.email;
@@ -103,11 +150,10 @@ async function run() {
         })
 
         // Send a ping to confirm a successful connection
-        await client.db("admin").command({ ping: 1 });
+        // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
-        // Ensures that the client will close when you finish/error
-        // await client.close();
+
     }
 }
 run().catch(console.dir);
